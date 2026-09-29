@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 DB_HOST = os.environ.get("DB_HOST", "db")
 DB_PORT = os.environ.get("DB_PORT", "5432")
-DB_NAME = os.environ.get("DB_NAME", "urlshortener")
+DB_NAME = os.environ.get("DB_NAME", "cuturl")
 DB_USER = os.environ.get("DB_USER", "postgres")
 DB_PASS = os.environ.get("DB_PASS", "postgres")
 
@@ -135,4 +135,4 @@ def init_db_with_retry(retries=10, delay=2):
 init_db_with_retry()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
