@@ -1,10 +1,10 @@
 import os
-import time
 import random
 import string
+import time
 
 import psycopg
-from flask import Flask, render_template, request, redirect, abort
+from flask import Flask, abort, redirect, render_template, request
 
 app = Flask(__name__)
 
@@ -113,7 +113,7 @@ def healthz():
         cur.close()
         conn.close()
         return "OK", 200
-    except Exception as e:
+    except psycopg.Error as e:
         app.logger.error(f"Health check failed: {e}")
         return "DB unreachable", 500
 
@@ -125,7 +125,7 @@ def init_db_with_retry(retries=10, delay=2):
         try:
             init_db()
             return
-        except Exception as e:
+        except psycopg.Error as e:
             app.logger.warning(f"DB not ready ({e}), retry {attempt + 1}/{retries}")
             time.sleep(delay)
     raise RuntimeError("Could not connect to database after retries")
@@ -135,4 +135,4 @@ def init_db_with_retry(retries=10, delay=2):
 init_db_with_retry()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
