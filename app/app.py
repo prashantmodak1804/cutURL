@@ -1,4 +1,5 @@
 import os
+import time
 import random
 import string
 
@@ -117,7 +118,6 @@ def healthz():
         return "DB unreachable", 500
 
 
-import time
 
 
 def init_db_with_retry(retries=10, delay=2):
