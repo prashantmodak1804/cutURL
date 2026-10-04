@@ -38,7 +38,6 @@ Current local stack:
 ```mermaid
 flowchart LR
     U["Browser / curl"] -->|"HTTP :80"| N["nginx<br/>nginx:1.30.5"]
-    U -.->|"HTTP :8000 (direct)"| A
     subgraph backend ["Docker bridge network: backend"]
         N -->|"proxy_pass :8000"| A["app<br/>Flask + gunicorn"]
         A -->|"PostgreSQL :5432"| D[("db<br/>postgres:17.11")]
@@ -49,7 +48,6 @@ flowchart LR
 | Service | Container port | Published on host | Notes |
 |---|---|---|---|
 | `nginx` | 80 | 80 | Entry point |
-| `app` | 8000 | 8000 | Direct access, bypasses Nginx |
 | `db` | 5432 | not published | Reachable only on the `backend` network |
 
 ## Tech stack
