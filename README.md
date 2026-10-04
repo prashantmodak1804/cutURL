@@ -7,6 +7,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17.11-4169E1?logo=postgresql&logoColor=white)
 ![Nginx](https://img.shields.io/badge/Nginx-1.30.5-009639?logo=nginx&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+[![CI](https://github.com/prashantmodak1804/cutURL/actions/workflows/ci.yml/badge.svg)](https://github.com/prashantmodak1804/cutURL/actions/workflows/ci.yml)
 
 - **Author:** Prashant Modak
 - **Roll number:** 25051775
@@ -74,7 +75,7 @@ cutURL/
 │   └── templates/index.html  # Front-end page
 ├── nginx/default.conf        # Reverse proxy config
 ├── scripts/deploy.sh         # Placeholder
-├── .github/workflows/ci.yml  # Placeholder, manual trigger only
+├── .github/workflows/ci.yml  # Lint, then build and push image to GHCR
 ├── Dockerfile                # Multi-stage image
 ├── docker-compose.yml        # db + app + nginx
 ├── .env.example              # Dummy values (committed)
