@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import string
@@ -7,6 +8,8 @@ import psycopg
 from flask import Flask, abort, redirect, render_template, request
 
 app = Flask(__name__)
+
+app.logger.setLevel(logging.INFO)
 
 DB_HOST = os.environ.get("DB_HOST", "db")
 DB_PORT = os.environ.get("DB_PORT", "5432")
