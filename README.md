@@ -13,13 +13,13 @@
 - **Roll number:** 25051775
 - **Track:** A (Ship It)
 - **Program:** GFG KIIT Student Chapter, Cloud & DevOps Domain, Foundation Project Task 01
-- **Status:** work in progress. This README is updated as each stage is completed.
+- **Status:** all seven stages and Track A are implemented; the architecture diagram image and the live deployment details are still to be added (see [Status](#status)).
 
 ## About
 
 cutURL is a small URL shortener. You paste a long link into a web page, the app generates a 6-character code, stores the pair in a PostgreSQL database, and returns a short link. Opening the short link redirects you to the original URL. A `/healthz` endpoint returns 200 only when the database is reachable. The app is deliberately small; the focus of the project is the infrastructure around it.
 
-The stack runs in two modes: **HTTP only** (the default; works on any machine after a fresh clone) and **HTTPS** (optional, for a public server with a hostname; see [Enable HTTPS](#enable-https-optional-cloud-only)).
+The stack runs in two modes: **HTTP only** (the default, works on any machine after a fresh clone) and **HTTPS** (optional, for a public server; see [Enable HTTPS](#enable-https-optional-cloud-only)).
 
 ## Contents
 
@@ -33,6 +33,7 @@ The stack runs in two modes: **HTTP only** (the default; works on any machine af
 - Startup is health-gated: database, then app, then Nginx.
 - Configuration comes entirely from a `.env` file; no credentials are committed.
 - Optional HTTPS through a Compose override file: Let's Encrypt certificate, HTTP to HTTPS redirect (301), proxy headers preserved.
+- One-command updates on the server with `scripts/deploy.sh`.
 
 ## Architecture
 
@@ -96,10 +97,10 @@ cutURL/
 │   └── templates/index.html  # Front-end page
 ├── nginx/
 │   ├── default.conf          # HTTP-only proxy config (default, works on any clone)
-│   └── https.conf            # HTTPS version (80 redirect + 443); keeps the YOUR_HOSTNAME placeholder, edited manually per server
+│   └── https.conf            # HTTPS config; keeps a YOUR_HOSTNAME placeholder
 ├── certbot/                  # Created at runtime, git-ignored (ACME challenge files)
 │   └── www/
-├── scripts/deploy.sh         # Placeholder
+├── scripts/deploy.sh         # Pull, rebuild with HTTPS override, wait for health
 ├── .github/workflows/ci.yml  # Lint, then build and push image to GHCR
 ├── Dockerfile                # Multi-stage image
 ├── docker-compose.yml        # db + app + nginx (HTTP only)
@@ -141,17 +142,13 @@ This is the whole local setup. HTTPS is not needed locally and is not enabled by
 
 ## Enable HTTPS (optional, cloud only)
 
-HTTPS needs a certificate, and a certificate only exists on a server that has a public hostname. If the committed Nginx config pointed at certificate files, every fresh clone would fail to start Nginx. So the default stack is HTTP only, and HTTPS is a separate layer added with a Compose override file. Anyone can stay local (HTTP) or go cloud (HTTPS).
-
-How the override works: when two Compose files are combined, a list of ports is added to, and a volume that mounts to the same container path replaces the earlier one. `docker-compose.https.yml` therefore adds port 443 and mounts `nginx/https.conf` over `/etc/nginx/conf.d/default.conf`.
+HTTPS needs a certificate, and a certificate only exists on a server with a public hostname. A committed HTTPS config that pointed at certificate files would break every fresh clone. So the default stack is HTTP only, and HTTPS is a Compose override file added on top: `docker-compose.https.yml` publishes port 443 and mounts `nginx/https.conf` over the default Nginx config. Anyone can stay local (HTTP) or go cloud (HTTPS).
 
 ### Prerequisites
 
-- A server with a public IP (for example an AWS EC2 `t3.micro`) with Docker installed and the repository cloned.
-- Ports **80 and 443** open in the security group (port 80 is required for certificate issuance and renewal).
-- A hostname pointing at the server's public IP. With [sslip.io](https://sslip.io) no setup is needed: for IP `13.233.1.2` the hostname is `13-233-1-2.sslip.io`.
-
-If the instance gets a new public IP (for example after a stop and start), the hostname changes and steps 2 to 5 must be repeated with the new hostname (in step 3, replace the old hostname in the same four places).
+- A server with a public IP (for example an AWS EC2 `t3.micro`), with Docker installed and the repository cloned.
+- Ports **80 and 443** open in the security group (port 80 is needed to issue and renew the certificate).
+- A hostname for that IP. With [sslip.io](https://sslip.io) no setup is needed: for IP `13.233.1.2` the hostname is `13-233-1-2.sslip.io`. If the public IP changes, the hostname changes too, so repeat steps 2 to 5 with the new one.
 
 ### Steps
 
@@ -174,17 +171,17 @@ If the instance gets a new public IP (for example after a stop and start), the h
      -d YOUR_HOSTNAME --agree-tos -m you@example.com
 ```
 
-   If it fails, check that the hostname resolves to the server (`dig +short YOUR_HOSTNAME`) and that port 80 is open, then run it once more.
+   If it fails, check that the hostname resolves to the server (`dig +short YOUR_HOSTNAME`) and that port 80 is open, then retry once.
 
-3. Set your hostname manually in `nginx/https.conf`. The committed file keeps the `YOUR_HOSTNAME` placeholder; nothing rewrites it automatically. Open the file and replace `YOUR_HOSTNAME` with your hostname (for example `13-233-1-2.sslip.io`) in four places: both `server_name` lines and both certificate paths.
+3. Edit `nginx/https.conf` and replace `YOUR_HOSTNAME` with your hostname in four places: both `server_name` lines and both certificate paths. The committed file keeps the placeholder; nothing replaces it automatically.
 
 ```bash
    nano nginx/https.conf
-   grep -n "server_name\|ssl_certificate" nginx/https.conf   # all four lines should show your hostname
-   grep -c YOUR_HOSTNAME nginx/https.conf                    # should print 0
+   grep -n "server_name\|ssl_certificate" nginx/https.conf   # all four lines show your hostname
+   grep -c YOUR_HOSTNAME nginx/https.conf                    # prints 0
 ```
 
-   Keep this edit on the server only and do not commit it, because the hostname is different for every deployment. If `git pull` later complains about this file, run `git stash`, then `git pull`, then `git stash pop`.
+   Keep this edit on the server and do not commit it, because the hostname differs per deployment. If `git pull` complains about this file, run `git stash`, `git pull`, then `git stash pop`.
 
 4. Start the stack with the HTTPS override:
 
@@ -192,18 +189,28 @@ If the instance gets a new public IP (for example after a stop and start), the h
    docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
 ```
 
-   Optional: to avoid typing both `-f` flags on every command in this shell, run `export COMPOSE_FILE=docker-compose.yml:docker-compose.https.yml` and then use plain `docker compose ...`.
+   Tip: `export COMPOSE_FILE=docker-compose.yml:docker-compose.https.yml` lets you use plain `docker compose ...` for the rest of that shell session.
 
 5. Verify:
 
 ```bash
-   curl -I http://YOUR_HOSTNAME/           # HTTP/1.1 301 Moved Permanently, Location: https://YOUR_HOSTNAME/
+   curl -I http://YOUR_HOSTNAME/           # 301 Moved Permanently, Location: https://YOUR_HOSTNAME/
    curl -i https://YOUR_HOSTNAME/healthz   # 200 OK, no certificate warning
-   # open the site, shorten a URL, then:
+   # shorten a URL in the site, then:
    docker compose -f docker-compose.yml -f docker-compose.https.yml logs app   # "Shortened ... for client <your public IP>"
 ```
 
    In a browser, `https://YOUR_HOSTNAME` shows a genuine padlock.
+
+### Deploy script
+
+After the one-time setup above, `scripts/deploy.sh` is the single command for later updates:
+
+```bash
+./scripts/deploy.sh; echo "exit code: $?"    # 0 if healthy, 1 if the health check failed
+```
+
+It reads the hostname from `nginx/https.conf`, runs `git pull --ff-only`, rebuilds and restarts the stack with the HTTPS override, then checks `https://<hostname>/healthz` up to 30 times, 2 seconds apart. If the endpoint answers it prints "Healthy" and exits 0; otherwise it prints an error and exits 1. It is safe to run twice in a row, because `docker compose up -d` only recreates containers whose image or configuration changed.
 
 ### Going back to HTTP only
 
@@ -214,7 +221,7 @@ docker compose up -d
 
 ### Certificate renewal
 
-Let's Encrypt certificates last 90 days. To renew, run certbot again with the same mounts, then reload Nginx. The ACME challenge location stays above the redirect in `nginx/https.conf`, so renewal over port 80 keeps working.
+Let's Encrypt certificates last 90 days. To renew, run certbot again with the same mounts, then reload Nginx. The challenge location stays above the redirect in `nginx/https.conf`, so renewal over port 80 keeps working.
 
 ```bash
 docker run --rm \
@@ -253,7 +260,7 @@ docker compose up -d
 # after about 40 seconds, run the SELECT again: the rows are still there
 ```
 
-Check and monitor HTTPS (cloud only, replace `YOUR_HOSTNAME`; in HTTPS mode every `docker compose` command needs both `-f` flags, or the `COMPOSE_FILE` export from the HTTPS steps):
+Check and monitor HTTPS (cloud only; in HTTPS mode every `docker compose` command needs both `-f` flags, or the `COMPOSE_FILE` export from the HTTPS steps):
 
 ```bash
 curl -I http://YOUR_HOSTNAME/           # 301 redirect to https://
@@ -261,7 +268,6 @@ curl -i https://YOUR_HOSTNAME/healthz   # 200 OK over TLS
 docker compose logs -f --tail 50 app    # after shortening a URL: "Shortened ... for client <real IP>"
 docker compose logs -f --tail 50 nginx  # Nginx access and error logs
 docker compose exec nginx nginx -t      # test the Nginx config
-docker compose exec nginx cat /etc/nginx/conf.d/default.conf   # which config is loaded (default.conf or https.conf)
 sudo ss -tulpn | grep -E ':(80|443)\b'   # listening ports on the host
 
 # certificate issuer and validity dates, as served by Nginx
@@ -288,7 +294,7 @@ Copy `.env.example` to `.env` (git-ignored, never commit it).
 
 Compose passes these to the `app` service through `env_file` and maps `DB_USER`, `DB_PASS` and `DB_NAME` onto the `POSTGRES_*` variables the `db` service needs.
 
-HTTPS needs no new environment variables. The hostname is set directly in `nginx/https.conf`; edit it manually on the server (the committed file keeps the `YOUR_HOSTNAME` placeholder).
+HTTPS adds no environment variables; its hostname is set by hand in `nginx/https.conf` (see step 3 of [Enable HTTPS](#enable-https-optional-cloud-only)).
 
 ## API
 
@@ -327,9 +333,8 @@ docker run -d --name cuturl --env-file .env -p 8000:8000 cuturl:dev   # needs a 
 
 - **Order:** `app` waits for `db` to be healthy, and `nginx` waits for `app` (`depends_on` with `service_healthy`).
 - **Networking:** all services share the custom `backend` bridge network and find each other by service name (`db`, `app`). Docker's embedded DNS server resolves those names to container IPs, so no IP address appears in the configuration.
-- **Proxy headers:** Nginx sets `Host`, `X-Forwarded-For` to `$remote_addr` (set by Nginx, so clients cannot forge it) and `X-Forwarded-Proto`. The app reads `X-Forwarded-For` and writes the real visitor IP to its log when a link is shortened or opened.
-- **HTTPS override:** `docker-compose.https.yml` adds `443:443`, mounts `nginx/https.conf` over `default.conf`, and mounts the host's `/etc/letsencrypt` read-only. Use both files: `docker compose -f docker-compose.yml -f docker-compose.https.yml up -d`.
-- **ACME challenge:** `./certbot/www` is mounted into Nginx at `/var/www/certbot`, and both Nginx configs serve `/.well-known/acme-challenge/` from it, so certbot can prove control of the hostname over port 80.
+- **Proxy headers:** Nginx sets `Host`, `X-Forwarded-For` to `$remote_addr` (set by Nginx, so clients cannot forge it) and `X-Forwarded-Proto`. The app reads `X-Forwarded-For` and logs the real visitor IP when a link is shortened or opened.
+- **HTTPS override:** `docker-compose.https.yml` adds `443:443`, mounts `nginx/https.conf` over `default.conf`, and mounts the host's `/etc/letsencrypt` read-only. Both Nginx configs serve `/.well-known/acme-challenge/` from `./certbot/www`, so certbot can prove control of the hostname over port 80.
 
 ## CI pipeline
 
@@ -365,16 +370,17 @@ If the package is private, run `docker login ghcr.io` first. The pipeline builds
 | `/healthz` returns 500 | Database unreachable; check that `db` is `healthy` in `docker compose ps` |
 | Port 80 already in use | Change the host side of the mapping in `docker-compose.yml`, for example `"8080:80"` |
 | Changed `DB_PASS`, app cannot log in | PostgreSQL only reads `POSTGRES_PASSWORD` on first initialisation; restore the old value or reset with `docker compose down -v` (deletes data) |
-| Certificate request fails | Check that the hostname resolves to the server (`dig +short YOUR_HOSTNAME`), port 80 is open in the security group, and the HTTP stack is running. Fix the cause, then retry once; do not loop, Let's Encrypt rate-limits failures |
+| Certificate request fails | Check that the hostname resolves to the server (`dig +short YOUR_HOSTNAME`), port 80 is open, and the HTTP stack is running. Retry once; do not loop, Let's Encrypt rate-limits failures |
 | Nginx exits or restarts with the HTTPS override | `nginx/https.conf` still contains `YOUR_HOSTNAME`, or the certificate does not exist yet. Check `docker compose logs nginx` and `sudo ls /etc/letsencrypt/live/` |
 | HTTPS times out from outside | Port 443 is not open in the security group |
 | Edited `nginx/https.conf` but nothing changed | Single-file mounts can keep showing the old file inside the container; run `docker compose restart nginx` |
-| No client IP lines in `docker compose logs app` | The app logs the visitor IP only when a link is shortened or opened, not on every request; shorten a URL first |
+| No client IP lines in `docker compose logs app` | The app logs the visitor IP only when a link is shortened or opened; shorten a URL first |
+| `deploy.sh` ends with "Health check failed" | `nginx/https.conf` still has the placeholder, the certificate is missing, or the stack is unhealthy; check `docker compose -f docker-compose.yml -f docker-compose.https.yml logs nginx app` |
 | Fresh clone fails to start Nginx | The HTTPS override is being used without a certificate; use plain `docker compose up -d` |
 
 ## Status
 
-Work in progress.
+All seven stages and Track A are implemented. Still to add: `docs/architecture.png`, the live deployment details above, and the teardown date.
 
 | Stage | Scope | Status |
 |---|---|---|
@@ -385,4 +391,4 @@ Work in progress.
 | 5 | AWS account and EC2 | Done |
 | 6 | Deploy to the cloud | Done |
 | 7 | Continuous integration and image delivery | Done (optional automatic deployment to EC2 not added) |
-| Track A | Reverse proxy and HTTPS (opt-in override), `scripts/deploy.sh` | In progress (HTTPS is live on EC2; `scripts/deploy.sh` is pending) |
+| Track A | Reverse proxy, HTTPS (opt-in override), `scripts/deploy.sh` | Done |
