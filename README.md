@@ -13,7 +13,7 @@
 - **Roll number:** 25051775
 - **Track:** A (Ship It)
 - **Program:** GFG KIIT Student Chapter, Cloud & DevOps Domain, Foundation Project Task 01
-- **Status:** all seven stages and Track A are implemented; the architecture diagram image and the live deployment details are still to be added (see [Status](#status)).
+- **Status:** all seven stages and Track A are implemented (see [Status](#status)).
 
 ## About
 
@@ -71,6 +71,8 @@ flowchart LR
 | `app` | 8000 | not published | Reachable only through Nginx |
 | `db` | 5432 | not published | Reachable only on the `backend` network |
 
+![Request path from browser to database](docs/architecture.png)
+
 ## Tech stack
 
 | Layer | Technology |
@@ -106,7 +108,7 @@ cutURL/
 ├── docker-compose.yml        # db + app + nginx (HTTP only)
 ├── docker-compose.https.yml  # Optional override: publishes 443, swaps in https.conf
 ├── docs/
-│   ├── architecture.png      # Architecture diagram (to be added)
+│   ├── architecture.png      # Architecture diagram
 │   └── screenshots/          # Evidence for each stage
 ├── .env.example              # Dummy values (committed)
 ├── .dockerignore
@@ -358,9 +360,9 @@ If the package is private, run `docker login ghcr.io` first. The pipeline builds
 
 | Item | Value |
 |---|---|
-| Live URL | _to be filled in while the instance is running_ |
-| Hostname | _`<ip-with-dashes>.sslip.io`_ |
-| Cloud resources torn down on | _to be filled in after teardown_ |
+| Live URL | https://15-135-115-253.sslip.io |
+| Hostname | 15-135-115-253.sslip.io |
+| Cloud resources torn down on | _to be filled in after report & video submission_ |
 
 ## Troubleshooting
 
@@ -380,7 +382,7 @@ If the package is private, run `docker login ghcr.io` first. The pipeline builds
 
 ## Status
 
-All seven stages and Track A are implemented. Still to add: `docs/architecture.png`, the live deployment details above, and the teardown date.
+All seven stages and Track A are implemented.
 
 | Stage | Scope | Status |
 |---|---|---|
